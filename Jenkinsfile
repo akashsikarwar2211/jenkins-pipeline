@@ -2,18 +2,21 @@ pipeline {
     agent any
 
     stages {
-        stage('Create File') {
+        stage('Build') {
             steps {
-                sh '''
-                    echo 'print("this is my pipeline")' > pipeline.py
-                    cat pipeline.py
-                '''
+                echo 'Building application...'
             }
         }
 
-        stage('Run Python') {
+        stage('Test') {
             steps {
-                sh 'python3 pipeline.py'
+                echo 'Running tests...'
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                echo 'Deploying application...'
             }
         }
     }
