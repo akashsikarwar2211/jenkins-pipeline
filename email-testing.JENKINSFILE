@@ -1,1 +1,77 @@
+pipeline {
+    agent {
+        kubernetes {
+            defaultContainer 'psql'
+            yaml '''
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: psql
+    image: postgres:18
+    command: ["cat"]
+    tty: true
+'''
+        }
+    }
 
+    triggers {
+        // 08:00 IST on day 1 and day 15 of every month
+        cron('TZ=Asia/Kolkata\n0 8 1,15 * *')
+    }
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '12'))
+    }
+
+    environment {
+        TENANT  = '809086'
+        DB_HOST = 'postgres-europe.postgres.database.azure.com'
+        DB_NAME = 'mdo-profile'
+        OUT     = "aarti_user_roles_${new Date().format('yyyy-MM-dd')}.csv"
+    }
+
+    stages {
+        stage('Export') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'AARTI_REPORT_DB',
+                                                  usernameVariable: 'DB_USER',
+                                                  passwordVariable: 'PGPASSWORD')]) {
+                    sh '''
+                        set -e
+                        export PGSSLMODE=require
+                        psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -c "
+                            copy (
+                            SELECT p.userid, p.fname, p.lname, p.pemail, p.status, r.roleid, r.description
+                            FROM "809086".role_description r
+                            JOIN "809086".user_roles f ON r.roleid = f.roleid
+                            JOIN "809086".user_personal_details p ON f.userid = p.username
+                            ORDER BY p.userid
+                          ) TO '${OUT}' WITH CSV HEADER"
+                        wc -l "${OUT}"
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            emailext(
+                to: 'akashsikarwar2211@gmail.com',
+                subject: "Aarti Industries - User and role report (${new Date().format('yyyy-MM-dd')})",
+                body: 'Hello,\n\nPlease find the user and role report attached.\n\nRegards,\nProspecta Support',
+                attachmentsPattern: "${env.OUT}"
+            )
+        }
+        failure {
+            emailext(
+                to: 'akashsikarwar2211@gmail.com',
+                subject: "FAILED: Aarti report job #${env.BUILD_NUMBER}",
+                body: "The scheduled report failed. See ${env.BUILD_URL}"
+            )
+        }
+    }
+}
