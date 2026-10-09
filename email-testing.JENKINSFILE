@@ -34,28 +34,28 @@ spec:
     }
 
     stages {
-        stage('Export') {
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'AARTI_REPORT_DB',
-                                                  usernameVariable: 'DB_USER',
-                                                  passwordVariable: 'PGPASSWORD')]) {
-                    sh '''
-                        set -e
-                        export PGSSLMODE=require
-                        psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -c "
-                            copy (
-                            SELECT p.userid, p.fname, p.lname, p.pemail, p.status, r.roleid, r.description
-                            FROM "809086".role_description r
-                            JOIN "809086".user_roles f ON r.roleid = f.roleid
-                            JOIN "809086".user_personal_details p ON f.userid = p.username
-                            ORDER BY p.userid
-                          ) TO '${OUT}' WITH CSV HEADER"
-                        wc -l "${OUT}"
-                    '''
-                }
-            }
+stage('Export') {
+    steps {
+        withCredentials([usernamePassword(credentialsId: 'AARTI_REPORT_DB',
+                                          usernameVariable: 'DB_USER',
+                                          passwordVariable: 'PGPASSWORD')]) {
+            sh '''
+                set -e
+                export PGSSLMODE=require
+                psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" \
+                     -v ON_ERROR_STOP=1 --csv -c '
+                    SELECT p.userid, p.fname, p.lname, p.pemail, p.status,
+                           r.roleid, r.description
+                    FROM "809086".role_description r
+                    JOIN "809086".user_roles f ON r.roleid = f.roleid
+                    JOIN "809086".user_personal_details p ON f.userid = p.username
+                    ORDER BY p.userid
+                ' > "$OUT"
+                wc -l "$OUT"
+            '''
         }
     }
+}
 
     post {
         success {
