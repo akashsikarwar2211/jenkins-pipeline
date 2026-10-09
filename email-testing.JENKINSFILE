@@ -1,19 +1,5 @@
 pipeline {
-    agent {
-        kubernetes {
-            defaultContainer 'psql'
-            yaml '''
-apiVersion: v1
-kind: Pod
-spec:
-  containers:
-  - name: psql
-    image: postgres:18
-    command: ["cat"]
-    tty: true
-'''
-        }
-    }
+    agent any
 
     triggers {
         // 08:00 IST on day 1 and day 15 of every month
